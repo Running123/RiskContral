@@ -5,13 +5,9 @@
 
 from pyspider.libs.base_handler import *
 import re
-import json
 
 class Handler(BaseHandler):
     crawl_config = {
-         'headers': {
-            'User-Agent': 'GoogleBot',
-            }
     }
 
     @every(minutes=24 * 60)
@@ -26,19 +22,23 @@ class Handler(BaseHandler):
         self.crawl([x.attr.href for x in response.doc('div#bottom_pager > a[name^="ssdln_157162_bottom_page-"] ').items()], callback=self.index_page)
 
     @config(priority=1)
-    def detail_page(self, response):    
+    def detail_page(self, response): 
         price_url = "http://icps.suning.com/icps-web/getAllPriceFourPage/000000000%s_0000000000_025_0250101_1_pc_showSaleStatus.vhtm"%(response.doc('#partNumberLable').text())
-        self.crawl(price_url, callback=self.price_page)
+        self.crawl(price_url, callback=self.price_page,save={'a':response.url,'b':response.doc('title').text() })
         
     @config(priority=2)
     def price_page(self, response):
        data = re.compile(u'"partNumber":"000000000(.*)","refPrice":"(.*)","netPrice":"(.*)","promotionPrice":"(.*)","priceType"')
        result = re.search(data, response.text)
-     
-       return  {
-                "url":'http://product.suning.com/%s.html'%result.group(1),
+       if result.group(4)=="":
+            price_url = "http://icps.suning.com/icps-web/getAllPriceFourPage/000000000%s__025_0250101_1_pc_showSaleStatus.vhtm"%(result.group(1))
+            self.crawl(price_url, callback=self.price_page,save={'a':response.save['a'],'b':response.save['b'] })
+       else:
+           return  {
+                "title":response.save['b'],
+                "url":response.save['a'],
                 "gds_cd": result.group(1),
                 "refPrice": result.group(2),
                 "netPrice": result.group(3),
                 "promotionPrice":result.group(4),
-             }
+                 }
